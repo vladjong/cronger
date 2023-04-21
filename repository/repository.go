@@ -8,6 +8,6 @@ import (
 
 type Repository interface {
 	AddJob(ctx context.Context, in model.Job) error
-	GetJobs(ctx context.Context) ([]model.Job, error)
 	RemoveJob(ctx context.Context, tag string) error
+	Create(ctx context.Context) error
 }

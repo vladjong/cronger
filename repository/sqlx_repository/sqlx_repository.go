@@ -14,6 +14,15 @@ const (
 	jobsTable = "jobs"
 )
 
+const (
+	queryCreate = `
+	CREATE TABLE product (
+		id uuid primary key,
+		tag text unique not null,
+		expression varchar(25) not null
+	);`
+)
+
 type Job struct {
 	Id         uuid.UUID `db:"id"`
 	Tag        string    `db:"tag"`
@@ -48,27 +57,11 @@ func (r *sqlxRepository) AddJob(ctx context.Context, in model.Job) error {
 	return nil
 }
 
-func (r *sqlxRepository) GetJobs(ctx context.Context) ([]model.Job, error) {
-	query, _, err := goqu.From(jobsTable).ToSQL()
-	if err != nil {
-		return nil, fmt.Errorf("configure query: %w", err)
+func (r *sqlxRepository) Create(ctx context.Context) error {
+	if _, err := r.db.ExecContext(ctx, queryCreate); err != nil {
+		return fmt.Errorf("create table: %w", err)
 	}
-
-	jobs := []Job{}
-	if err := r.db.SelectContext(ctx, &jobs, query); err != nil {
-		return nil, fmt.Errorf("insert job: %w", err)
-	}
-
-	out := make([]model.Job, len(jobs))
-	for i, val := range jobs {
-		job := model.Job{
-			Id:         val.Id,
-			Tag:        val.Tag,
-			Expression: val.Expression,
-		}
-		out[i] = job
-	}
-	return out, nil
+	return nil
 }
 
 func (r *sqlxRepository) RemoveJob(ctx context.Context, tag string) error {

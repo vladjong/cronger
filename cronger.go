@@ -36,6 +36,7 @@ type Config struct {
 	Loc        *time.Location
 	TypeClient int
 	Client     interface{}
+	IsMigrate  bool
 }
 
 func New(cfg *Config) (*Cronger, error) {
@@ -49,6 +50,15 @@ func New(cfg *Config) (*Cronger, error) {
 
 	if err := c.checkDriver(); err != nil {
 		return nil, err
+	}
+
+	if !cfg.IsMigrate {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := c.repo.Create(ctx); err != nil {
+			return nil, err
+		}
 	}
 	return c, nil
 }
