@@ -80,6 +80,10 @@ func New(cfg *Config) (*cronger, error) {
 }
 
 func (c *cronger) AddJob(tag, expression string, task func()) error {
+	if _, err := c.schedule.Cron(expression).Tag(tag).Do(task); err != nil {
+		return fmt.Errorf("create job: %w", err)
+	}
+
 	job := model.Job{
 		Id:         uuid.New(),
 		Tag:        tag,
@@ -89,10 +93,6 @@ func (c *cronger) AddJob(tag, expression string, task func()) error {
 
 	if err := c.addJob(job); err != nil {
 		return err
-	}
-
-	if _, err := c.schedule.Cron(expression).Tag(tag).Do(task); err != nil {
-		return fmt.Errorf("create job: %w", err)
 	}
 
 	c.mu.Lock()

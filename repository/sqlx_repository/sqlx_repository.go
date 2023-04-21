@@ -13,6 +13,7 @@ import (
 const (
 	jobsTable = "jobs"
 	isWork    = "is_work"
+	tag       = "tag"
 )
 
 const (
@@ -79,6 +80,10 @@ func (r *sqlxRepository) BackupJobs(ctx context.Context) ([]model.Job, error) {
 		Set(goqu.Record{
 			isWork: false,
 		}).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("configure query: %w", err)
+	}
+
 	if _, err := tx.ExecContext(ctx, query); err != nil {
 		return nil, fmt.Errorf("update jobs: %w", err)
 	}
@@ -104,6 +109,10 @@ func (r *sqlxRepository) BackupJobs(ctx context.Context) ([]model.Job, error) {
 		}
 		out[i] = job
 	}
+
+	if err = tx.Commit(); err != nil {
+		return nil, err
+	}
 	return out, nil
 }
 
@@ -115,7 +124,10 @@ func (r *sqlxRepository) AddJob(ctx context.Context, in model.Job) error {
 		IsWork:     in.IsWork,
 	}
 
-	query, _, err := goqu.Insert(jobsTable).Rows(job).OnConflict(goqu.DoUpdate(isWork, true)).ToSQL()
+	query, _, err := goqu.Insert(jobsTable).
+		Rows(job).
+		OnConflict(goqu.DoUpdate(tag, job)).
+		ToSQL()
 	if err != nil {
 		return fmt.Errorf("configure query: %w", err)
 	}
