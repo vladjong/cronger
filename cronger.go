@@ -120,7 +120,7 @@ func (c *cronger) RemoveJob(tag string) error {
 	return nil
 }
 
-func (c *cronger) GetAllJobs() ([]model.Job, error) {
+func (c *cronger) Jobs() ([]model.Job, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -135,7 +135,7 @@ func (c *cronger) GetAllJobs() ([]model.Job, error) {
 	return jobs, nil
 }
 
-func (c *cronger) GetBackupJobs() ([]model.Job, error) {
+func (c *cronger) BackupJobs() ([]model.Job, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
