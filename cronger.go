@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/go-co-op/gocron"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
+
 	"github.com/vladjong/cronger/model"
 	"github.com/vladjong/cronger/repository"
 	"github.com/vladjong/cronger/repository/sqlx_repository"
@@ -24,12 +24,10 @@ const (
 	Sqlx = iota
 )
 
-type Cronger struct {
+type cronger struct {
 	cfg      *Config
 	schedule *gocron.Scheduler
 	repo     repository.Repository
-	cache    map[string]model.Job
-	mu       sync.Mutex
 }
 
 type Config struct {
@@ -39,11 +37,11 @@ type Config struct {
 	IsMigrate  bool
 }
 
-func New(cfg *Config) (*Cronger, error) {
+func New(cfg *Config) (*cronger, error) {
 	schedule := gocron.NewScheduler(cfg.Loc)
 	schedule.TagsUnique()
 
-	c := &Cronger{
+	c := &cronger{
 		cfg:      cfg,
 		schedule: schedule,
 	}
@@ -63,19 +61,12 @@ func New(cfg *Config) (*Cronger, error) {
 	return c, nil
 }
 
-func (c *Cronger) AddJob(tag, expression string, task func()) error {
+func (c *cronger) AddJob(tag, expression string, task func()) error {
 	job := model.Job{
 		Id:         uuid.New(),
 		Tag:        tag,
-		Expression: tag,
+		Expression: expression,
 	}
-
-	c.mu.Lock()
-	if _, ok := c.cache[tag]; ok {
-		return fmt.Errorf("job tag=%s is exist", tag)
-	}
-	c.cache[tag] = job
-	c.mu.Unlock()
 
 	if err := c.addJob(job); err != nil {
 		return err
@@ -87,32 +78,29 @@ func (c *Cronger) AddJob(tag, expression string, task func()) error {
 	return nil
 }
 
-func (c *Cronger) RemoveJob(tag string) error {
-	c.mu.Lock()
-	if _, ok := c.cache[tag]; !ok {
-		return fmt.Errorf("job tag=%s don't exist", tag)
-	}
-	delete(c.cache, tag)
-	c.mu.Unlock()
-
+func (c *cronger) RemoveJob(tag string) error {
 	if err := c.removeJob(tag); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Cronger) GetAllJob() []model.Job {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+func (c *cronger) GetAllJob() ([]model.Job, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	jobs := make([]model.Job, 0, len(c.cache))
-	for _, job := range c.cache {
-		jobs = append(jobs, job)
+	jobs, err := c.repo.Jobs(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return jobs
+	return jobs, nil
 }
 
-func (c *Cronger) addJob(job model.Job) error {
+func (c *cronger) StartAsync() {
+	c.schedule.StartAsync()
+}
+
+func (c *cronger) addJob(job model.Job) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -122,7 +110,7 @@ func (c *Cronger) addJob(job model.Job) error {
 	return nil
 }
 
-func (c *Cronger) removeJob(tag string) error {
+func (c *cronger) removeJob(tag string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -132,19 +120,19 @@ func (c *Cronger) removeJob(tag string) error {
 	return nil
 }
 
-func (c *Cronger) checkDriver() error {
+func (c *cronger) checkDriver() error {
 	switch c.cfg.TypeClient {
 	case Sqlx:
 		db, ok := c.cfg.Client.(*sqlx.DB)
 		if !ok {
 			typeOf := reflect.TypeOf(c.cfg.Client).String()
-			return NewIncorrectClientError(SqlxName, typeOf)
+			return newIncorrectClientError(SqlxName, typeOf)
 		}
 		c.repo = sqlx_repository.New(db)
 
 	default:
 		typeOf := reflect.TypeOf(c.cfg.Client).String()
-		return NewIncorrectClientError(UndefinedName, typeOf)
+		return newIncorrectClientError(UndefinedName, typeOf)
 	}
 	return nil
 }

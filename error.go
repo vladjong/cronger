@@ -4,22 +4,22 @@ import (
 	"fmt"
 )
 
-type IncorrectClientError struct {
+type incorrectClientError struct {
 	name   string
 	typeOf string
 }
 
-func NewIncorrectClientError(name, typeOf string) *IncorrectClientError {
-	return &IncorrectClientError{
+func newIncorrectClientError(name, typeOf string) *incorrectClientError {
+	return &incorrectClientError{
 		name:   name,
 		typeOf: typeOf,
 	}
 }
 
-func (e *IncorrectClientError) Error() string {
+func (e *incorrectClientError) Error() string {
 	return fmt.Sprintf("incorrect client=%s, type=%s", e.name, e.typeOf)
 }
 
-func (e *IncorrectClientError) Unwrap() error {
+func (e *incorrectClientError) Unwrap() error {
 	return fmt.Errorf("incorrect client=%s, type=%s", e.name, e.typeOf)
 }
