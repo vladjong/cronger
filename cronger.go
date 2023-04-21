@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/go-co-op/gocron"
@@ -25,9 +26,11 @@ const (
 )
 
 type cronger struct {
-	cfg      *Config
-	schedule *gocron.Scheduler
-	repo     repository.Repository
+	cfg        *Config
+	schedule   *gocron.Scheduler
+	repo       repository.Repository
+	backupJobs map[string]model.Job
+	mu         sync.Mutex
 }
 
 type Config struct {
@@ -50,14 +53,29 @@ func New(cfg *Config) (*cronger, error) {
 		return nil, err
 	}
 
-	if !cfg.IsMigrate {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
+	if !cfg.IsMigrate {
 		if err := c.repo.Create(ctx); err != nil {
 			return nil, err
 		}
 	}
+
+	jobs, err := c.repo.BackupJobs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	backupJobs := make(map[string]model.Job)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, job := range jobs {
+		backupJobs[job.Tag] = job
+	}
+	c.backupJobs = backupJobs
+
 	return c, nil
 }
 
@@ -66,6 +84,7 @@ func (c *cronger) AddJob(tag, expression string, task func()) error {
 		Id:         uuid.New(),
 		Tag:        tag,
 		Expression: expression,
+		IsWork:     true,
 	}
 
 	if err := c.addJob(job); err != nil {
@@ -75,12 +94,28 @@ func (c *cronger) AddJob(tag, expression string, task func()) error {
 	if _, err := c.schedule.Cron(expression).Tag(tag).Do(task); err != nil {
 		return fmt.Errorf("create job: %w", err)
 	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.backupJobs[tag]; ok {
+		delete(c.backupJobs, tag)
+	}
 	return nil
 }
 
 func (c *cronger) RemoveJob(tag string) error {
 	if err := c.removeJob(tag); err != nil {
 		return err
+	}
+
+	if err := c.schedule.RemoveByTag(tag); err != nil {
+		return err
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.backupJobs[tag]; ok {
+		delete(c.backupJobs, tag)
 	}
 	return nil
 }
@@ -98,6 +133,10 @@ func (c *cronger) GetAllJob() ([]model.Job, error) {
 
 func (c *cronger) StartAsync() {
 	c.schedule.StartAsync()
+}
+
+func (c *cronger) Stop() {
+	c.schedule.Stop()
 }
 
 func (c *cronger) addJob(job model.Job) error {

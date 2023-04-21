@@ -6,4 +6,5 @@ type Job struct {
 	Id         uuid.UUID
 	Tag        string
 	Expression string
+	IsWork     bool
 }

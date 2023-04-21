@@ -12,6 +12,7 @@ import (
 
 const (
 	jobsTable = "jobs"
+	isWork    = "is_work"
 )
 
 const (
@@ -19,7 +20,8 @@ const (
 	CREATE TABLE jobs (
 		id uuid primary key,
 		tag text unique not null,
-		expression varchar(25) not null
+		expression varchar(25) not null,
+		is_work boolean not null
 	);`
 )
 
@@ -27,6 +29,7 @@ type Job struct {
 	Id         uuid.UUID `db:"id"`
 	Tag        string    `db:"tag"`
 	Expression string    `db:"expression"`
+	IsWork     bool      `db:"is_work"`
 }
 
 type sqlxRepository struct {
@@ -40,14 +43,15 @@ func New(db *sqlx.DB) *sqlxRepository {
 }
 
 func (r *sqlxRepository) Jobs(ctx context.Context) ([]model.Job, error) {
-	query, _, err := goqu.From(jobsTable).ToSQL()
+	query, _, err := goqu.From(jobsTable).
+		Where(goqu.C(isWork).Eq(true)).ToSQL()
 	if err != nil {
 		return nil, fmt.Errorf("configure query: %w", err)
 	}
 
 	jobs := []Job{}
 	if err := r.db.SelectContext(ctx, &jobs, query); err != nil {
-		return nil, fmt.Errorf("insert job: %w", err)
+		return nil, fmt.Errorf("select jobs: %w", err)
 	}
 
 	out := make([]model.Job, len(jobs))
@@ -62,14 +66,56 @@ func (r *sqlxRepository) Jobs(ctx context.Context) ([]model.Job, error) {
 	return out, nil
 }
 
+func (r *sqlxRepository) BackupJobs(ctx context.Context) ([]model.Job, error) {
+	tx, err := r.db.Beginx()
+	defer func() {
+		_ = tx.Rollback()
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	query, _, err := goqu.Update(jobsTable).
+		Set(goqu.Record{
+			isWork: false,
+		}).ToSQL()
+	if _, err := tx.ExecContext(ctx, query); err != nil {
+		return nil, fmt.Errorf("update jobs: %w", err)
+	}
+
+	query, _, err = goqu.From(jobsTable).
+		Where(goqu.C(isWork).Eq(false)).ToSQL()
+	if err != nil {
+		return nil, fmt.Errorf("configure query: %w", err)
+	}
+
+	jobs := []Job{}
+	if err := tx.SelectContext(ctx, &jobs, query); err != nil {
+		return nil, fmt.Errorf("select jobs: %w", err)
+	}
+
+	out := make([]model.Job, len(jobs))
+	for i, val := range jobs {
+		job := model.Job{
+			Id:         val.Id,
+			Tag:        val.Tag,
+			Expression: val.Expression,
+			IsWork:     val.IsWork,
+		}
+		out[i] = job
+	}
+	return out, nil
+}
+
 func (r *sqlxRepository) AddJob(ctx context.Context, in model.Job) error {
 	job := Job{
 		Id:         in.Id,
 		Tag:        in.Tag,
 		Expression: in.Expression,
+		IsWork:     in.IsWork,
 	}
 
-	query, _, err := goqu.Insert(jobsTable).Rows(job).ToSQL()
+	query, _, err := goqu.Insert(jobsTable).Rows(job).OnConflict(goqu.DoUpdate(isWork, true)).ToSQL()
 	if err != nil {
 		return fmt.Errorf("configure query: %w", err)
 	}
