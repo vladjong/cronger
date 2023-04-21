@@ -120,13 +120,32 @@ func (c *cronger) RemoveJob(tag string) error {
 	return nil
 }
 
-func (c *cronger) GetAllJob() ([]model.Job, error) {
+func (c *cronger) GetAllJobs() ([]model.Job, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	jobs, err := c.repo.Jobs(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(jobs) == 0 {
+		return nil, fmt.Errorf("empty jobs list")
+	}
+	return jobs, nil
+}
+
+func (c *cronger) GetBackupJobs() ([]model.Job, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if len(c.backupJobs) == 0 {
+		return nil, fmt.Errorf("empty backupd jobs list")
+	}
+
+	jobs := make([]model.Job, 0, len(c.backupJobs))
+	for _, job := range c.backupJobs {
+		jobs = append(jobs, job)
 	}
 	return jobs, nil
 }
