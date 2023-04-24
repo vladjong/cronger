@@ -18,7 +18,7 @@ const (
 
 const (
 	queryCreate = `
-	CREATE TABLE jobs (
+	CREATE TABLE IF NOT EXISTS jobs (
 		id uuid primary key,
 		title text not null,
 		tag text unique not null,
