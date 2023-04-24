@@ -172,13 +172,13 @@ func (c *cronger) checkDriver() error {
 	case Sqlx:
 		db, ok := c.cfg.Client.(*sqlx.DB)
 		if !ok {
-			typeOf := reflect.TypeOf(c.cfg.Client).String()
+			typeOf := reflect.TypeOf(c.cfg.Client)
 			return newIncorrectClientError(SqlxName, typeOf)
 		}
 		c.repo = sqlx_repository.New(db)
 
 	default:
-		typeOf := reflect.TypeOf(c.cfg.Client).String()
+		typeOf := reflect.TypeOf(c.cfg.Client)
 		return newIncorrectClientError(UndefinedName, typeOf)
 	}
 	return nil
