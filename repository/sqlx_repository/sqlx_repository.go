@@ -20,6 +20,7 @@ const (
 	queryCreate = `
 	CREATE TABLE jobs (
 		id uuid primary key,
+		title text not null,
 		tag text unique not null,
 		expression varchar(25) not null,
 		is_work boolean not null
@@ -28,6 +29,7 @@ const (
 
 type Job struct {
 	Id         uuid.UUID `db:"id"`
+	Title      string    `db:"title"`
 	Tag        string    `db:"tag"`
 	Expression string    `db:"expression"`
 	IsWork     bool      `db:"is_work"`
@@ -59,8 +61,10 @@ func (r *sqlxRepository) Jobs(ctx context.Context) ([]model.Job, error) {
 	for i, val := range jobs {
 		job := model.Job{
 			Id:         val.Id,
+			Title:      val.Title,
 			Tag:        val.Tag,
 			Expression: val.Expression,
+			IsWork:     val.IsWork,
 		}
 		out[i] = job
 	}
@@ -103,6 +107,7 @@ func (r *sqlxRepository) BackupJobs(ctx context.Context) ([]model.Job, error) {
 	for i, val := range jobs {
 		job := model.Job{
 			Id:         val.Id,
+			Title:      val.Title,
 			Tag:        val.Tag,
 			Expression: val.Expression,
 			IsWork:     val.IsWork,
@@ -119,6 +124,7 @@ func (r *sqlxRepository) BackupJobs(ctx context.Context) ([]model.Job, error) {
 func (r *sqlxRepository) AddJob(ctx context.Context, in model.Job) error {
 	job := Job{
 		Id:         in.Id,
+		Title:      in.Title,
 		Tag:        in.Tag,
 		Expression: in.Expression,
 		IsWork:     in.IsWork,

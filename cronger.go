@@ -25,6 +25,10 @@ const (
 	Sqlx = iota
 )
 
+const (
+	timeOut = 5 * time.Second
+)
+
 type cronger struct {
 	cfg        *Config
 	schedule   *gocron.Scheduler
@@ -53,7 +57,7 @@ func New(cfg *Config) (*cronger, error) {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeOut)
 	defer cancel()
 
 	if !cfg.IsMigrate {
@@ -79,13 +83,14 @@ func New(cfg *Config) (*cronger, error) {
 	return c, nil
 }
 
-func (c *cronger) AddJob(tag, expression string, task func()) error {
+func (c *cronger) AddJob(title, tag, expression string, task func()) error {
 	if _, err := c.schedule.Cron(expression).Tag(tag).Do(task); err != nil {
 		return fmt.Errorf("create job: %w", err)
 	}
 
 	job := model.Job{
 		Id:         uuid.New(),
+		Title:      title,
 		Tag:        tag,
 		Expression: expression,
 		IsWork:     true,
@@ -95,11 +100,7 @@ func (c *cronger) AddJob(tag, expression string, task func()) error {
 		return err
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if _, ok := c.backupJobs[tag]; ok {
-		delete(c.backupJobs, tag)
-	}
+	c.deleteJobInBackup(tag)
 	return nil
 }
 
@@ -112,42 +113,30 @@ func (c *cronger) RemoveJob(tag string) error {
 		return err
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if _, ok := c.backupJobs[tag]; ok {
-		delete(c.backupJobs, tag)
-	}
+	c.deleteJobInBackup(tag)
 	return nil
 }
 
 func (c *cronger) Jobs() ([]model.Job, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeOut)
 	defer cancel()
 
 	jobs, err := c.repo.Jobs(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	if len(jobs) == 0 {
-		return nil, fmt.Errorf("empty jobs list")
-	}
 	return jobs, nil
 }
 
-func (c *cronger) BackupJobs() ([]model.Job, error) {
+func (c *cronger) BackupJobs() []model.Job {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-
-	if len(c.backupJobs) == 0 {
-		return nil, fmt.Errorf("empty backupd jobs list")
-	}
 
 	jobs := make([]model.Job, 0, len(c.backupJobs))
 	for _, job := range c.backupJobs {
 		jobs = append(jobs, job)
 	}
-	return jobs, nil
+	return jobs
 }
 
 func (c *cronger) StartAsync() {
@@ -159,7 +148,7 @@ func (c *cronger) Stop() {
 }
 
 func (c *cronger) addJob(job model.Job) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeOut)
 	defer cancel()
 
 	if err := c.repo.AddJob(ctx, job); err != nil {
@@ -169,7 +158,7 @@ func (c *cronger) addJob(job model.Job) error {
 }
 
 func (c *cronger) removeJob(tag string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), timeOut)
 	defer cancel()
 
 	if err := c.repo.RemoveJob(ctx, tag); err != nil {
@@ -193,4 +182,12 @@ func (c *cronger) checkDriver() error {
 		return newIncorrectClientError(UndefinedName, typeOf)
 	}
 	return nil
+}
+
+func (c *cronger) deleteJobInBackup(tag string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if _, ok := c.backupJobs[tag]; ok {
+		delete(c.backupJobs, tag)
+	}
 }

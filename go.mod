@@ -7,5 +7,6 @@ require (
 	github.com/go-co-op/gocron v1.22.4 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/jmoiron/sqlx v1.3.5 // indirect
+	github.com/lib/pq v1.10.8 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 )
