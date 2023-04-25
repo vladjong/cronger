@@ -42,20 +42,20 @@ cr, err := cronger.New(&cronger.Config{
 })
 ```
 
-### Stop
-
-Stop performing jobs `cronger`  
-
-```go
-jobs, err := cr.Jobs()
-```
-
 ### StartAsync
 
 Starts `cronger` asynchronously
 
 ```go
 cr.StartAsync()
+```
+
+### Stop
+
+Stop performing jobs `cronger`  
+
+```go
+cr.Stop()
 ```
 
 ### Add
