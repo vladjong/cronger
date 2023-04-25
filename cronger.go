@@ -66,20 +66,9 @@ func New(cfg *Config) (*cronger, error) {
 		}
 	}
 
-	jobs, err := c.repo.BackupJobs(ctx)
-	if err != nil {
+	if err := c.backup(); err != nil {
 		return nil, err
 	}
-
-	backupJobs := make(map[string]model.Job)
-
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for _, job := range jobs {
-		backupJobs[job.Tag] = job
-	}
-	c.backupJobs = backupJobs
-
 	return c, nil
 }
 
@@ -190,4 +179,24 @@ func (c *cronger) deleteJobInBackup(tag string) {
 	if _, ok := c.backupJobs[tag]; ok {
 		delete(c.backupJobs, tag)
 	}
+}
+
+func (c *cronger) backup() error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeOut)
+	defer cancel()
+
+	jobs, err := c.repo.BackupJobs(ctx)
+	if err != nil {
+		return err
+	}
+
+	backupJobs := make(map[string]model.Job)
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, job := range jobs {
+		backupJobs[job.Tag] = job
+	}
+	c.backupJobs = backupJobs
+	return nil
 }
