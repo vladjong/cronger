@@ -1,4 +1,8 @@
-`cronger` is a expressive job planning package with permanent data storage
+![Cronger](logo.png)
+
+# Cronger
+
+`cronger` is an expressive work planning package with permanent data storage based on the package [go-co-op/gocron](https://github.com/go-co-op/gocron)
 
 ## Installation
 
@@ -94,7 +98,6 @@ backJob = cr.BackupJobs()
 ```
 
 For more examples, take a look in our [examples](example/sqlx_example/main.go)
-
 
 ## Running tests
 
