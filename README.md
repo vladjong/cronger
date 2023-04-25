@@ -99,6 +99,12 @@ backJob = cr.BackupJobs()
 
 For more examples, take a look in our [examples](example/sqlx_example/main.go)
 
+## Supported drivers
+
+- [x] Sqlx
+- [ ] Mongo
+- [ ] MySql
+
 ## Running tests
 
 ```sh
