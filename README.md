@@ -1,4 +1,4 @@
-![Cronger](logo.png)
+![Cronger](logo_cronger.png)
 
 # Cronger
 
